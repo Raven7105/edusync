@@ -1,4 +1,4 @@
-import { createContext } from "react";
+import { createContext, useContext } from "react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/api/supabaseClient";
 

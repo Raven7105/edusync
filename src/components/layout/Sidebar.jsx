@@ -1,13 +1,10 @@
 import { useAuth } from "@/lib/AuthContext";
 import { BarChart2, BookOpen, Calendar, CalendarX, ClipboardList, CreditCard, Eye, FileText, GraduationCap, LayoutDashboard, Menu, MessageSquare, School, Settings2, Users, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { Link ,useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/api/supabaseClient";
-
-
-
-
+import Logo from "@/assets/logo.svg";
 
 
 const navItems = [
@@ -72,22 +69,15 @@ export default function Sidebar() {
                 mobileOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 {/* Logo */}
-                <div className="p-4 border-b border-sidebar-border">
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-xl bg-sidebar-primary flex items-center justify-center">
-                            <BookOpen className="w-5 h-5 text-sidebar-primary-foreground" />
+                    <div className="p-4 border-b border-sidebar-border">
+                        <div className="flex items-center gap-3 mb-3">
+                            <img src={Logo} alt="Edusync" className="h-8 w-auto brightness-0 invert" />
                         </div>
-                        <div>
-                            <h1 className="font-bold text-lg tracking-tight">Edusync</h1>
-                            <p className="text-xs text-sidebar-foreground/60">Gestion en milieu scolaire</p>
-                        </div>
+                        {/* <GlobalSearch /> */}
                     </div>
-                    {/* Search */}
-                    {/* <GlobalSearch /> */}
-                </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+                <nav className="flex-1 p-3 space-y-5 overflow-y-auto">
                     {navItems.map((item) => {
                         const isActive = location.pathname === item.path;
                         return (
