@@ -23,9 +23,8 @@ const navItems = [
     { label: 'Paramètres école', icon: Settings2, path: '/parametres' },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ mobileOpen, setMobileOpen }) {
     const location = useLocation();
-    const [mobileOpen, setMobileOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
     const { user } = useAuth();
 
