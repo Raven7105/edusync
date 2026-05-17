@@ -7,6 +7,7 @@ import { AuthProvider } from './lib/AuthContext'
 import Login from './pages/Login'
 import AppLayout from './components/layout/AppLayout'
 import Dashboard from './pages/Dashboard'
+import Students from './pages/Students'
 
 const queryClient = new QueryClient()
 
@@ -43,6 +44,7 @@ function App() {
             ) : (
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/eleves" element={<Students />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Route>
             )}
