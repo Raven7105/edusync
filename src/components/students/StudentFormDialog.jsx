@@ -16,7 +16,7 @@ const LEVELS_BY_CYCLE = {
 
 const DEFAULT_FORM = {
     first_name: '', last_name: '', date_of_birth: '', gender: 'M',
-    cycle: 'Primaire', level: 'CP', class_id: '', parent_name: '',
+    cycle: 'Primaire', level: 'CP', class_id: 'null', parent_name: '',
     parent_phone: '', parent_email: '', address: '', status: 'Actif',
     enrollment_date: new Date().toISOString().split('T')[0], photo_url: '',
 };
@@ -65,7 +65,13 @@ export default function StudentFormDialog({ open, onOpenChange, student, classes
         e.preventDefault();
         setSaving(true);
         try {
-            await onSave(form);
+            const cleanedForm = {
+                ...form,
+                class_id: form.class_id || null,
+                date_of_birth: form.date_of_birth || null,
+                photo_url: form.photo_url || null,
+            };
+            await onSave(cleanedForm);
         } finally {
             setSaving(false);
         }
