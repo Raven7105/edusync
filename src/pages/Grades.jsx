@@ -223,6 +223,15 @@ export default function Grades() {
         return matchSearch && matchTrimester && matchSubject;
     });
 
+    const { data: teachers = [] } = useQuery({
+        queryKey: ['teachers'],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('teachers').select('*');
+            if (error) throw error;
+            return data || [];
+        },
+    });
+
     const isPending = createMut.isPending || updateMut.isPending || deleteMut.isPending;
 
     return (
@@ -386,13 +395,35 @@ export default function Grades() {
                                     </SelectContent>
                                 </Select>
                             </div>
-
                             {/* Professeur */}
                             <div className="space-y-1.5 col-span-2">
                                 <Label>Professeur</Label>
-                                <Input value={form.teacher_name}
-                                    onChange={e => setForm(f => ({ ...f, teacher_name: e.target.value }))}
-                                    placeholder="Nom du professeur" />
+                                <Select
+                                    value={form.teacher_name}
+                                    onValueChange={v => setForm(f => ({ ...f, teacher_name: v }))}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Sélectionner un professeur" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {teachers
+                                            .filter(t =>
+                                                t.status === 'Actif' &&
+                                                t.subjects?.includes(form.subject)
+                                            )
+                                            .map(t => (
+                                                <SelectItem key={t.id} value={`${t.first_name} ${t.last_name}`}>
+                                                    {t.first_name} {t.last_name}
+                                                </SelectItem>
+                                            ))
+                                        }
+                                        {teachers.filter(t => t.status === 'Actif' && t.subjects?.includes(form.subject)).length === 0 && (
+                                            <SelectItem value="none" disabled>
+                                                Aucun prof pour cette matière
+                                            </SelectItem>
+                                        )}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
 
