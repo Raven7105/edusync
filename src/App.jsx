@@ -9,6 +9,7 @@ import AppLayout from './components/layout/AppLayout'
 import Dashboard from './pages/Dashboard'
 import Students from './pages/Students'
 import Teachers from './pages/Teachers'
+import Classes from './pages/Classes'
 
 const queryClient = new QueryClient()
 
@@ -47,6 +48,7 @@ function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/eleves" element={<Students />} />
                 <Route path="/enseignants" element={<Teachers />} />
+                <Route path="/classes" element={<Classes />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Route>
             )}
