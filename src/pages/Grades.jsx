@@ -198,8 +198,10 @@ export default function Grades() {
 
         const finalGrade = form.grade !== '' ? parseFloat(form.grade) : (autoGrade !== '' ? autoGrade : 0);
 
+        const { cycle, ...formWithoutCycle } = form;
+
         const payload = {
-            ...form,
+            ...formWithoutCycle,
             grade: finalGrade,
             note_evaluation: form.note_evaluation !== '' ? parseFloat(form.note_evaluation) : null,
             note_examen: form.note_examen !== '' ? parseFloat(form.note_examen) : null,
