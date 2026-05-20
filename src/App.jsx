@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard'
 import Students from './pages/Students'
 import Teachers from './pages/Teachers'
 import Classes from './pages/Classes'
+import Grades from './pages/Grades'
 
 const queryClient = new QueryClient()
 
@@ -49,6 +50,7 @@ function App() {
                 <Route path="/eleves" element={<Students />} />
                 <Route path="/enseignants" element={<Teachers />} />
                 <Route path="/classes" element={<Classes />} />
+                <Route path="/notes" element={<Grades />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Route>
             )}
