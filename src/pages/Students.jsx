@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/api/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,6 +10,8 @@ import EmptyState from '@/components/shared/EmptyState';
 import StudentFormDialog from '@/components/students/StudentFormDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import toast from 'react-hot-toast';
+import { fetchStudents, createStudent, updateStudent, deleteStudent } from '@/api/students';
+import { fetchClasses } from '@/api/classes';
 
 export default function Students() {
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -23,30 +24,16 @@ export default function Students() {
 
     const { data: students = [], isLoading } = useQuery({
         queryKey: ['students'],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from('students')
-                .select('*')
-                .order('created_at', { ascending: false });
-            if (error) throw error;
-            return data || [];
-        },
+        queryFn: fetchStudents,
     });
 
     const { data: classes = [] } = useQuery({
         queryKey: ['classes'],
-        queryFn: async () => {
-            const { data, error } = await supabase.from('school_classes').select('*');
-            if (error) throw error;
-            return data || [];
-        },
+        queryFn: fetchClasses,
     });
 
     const createMutation = useMutation({
-        mutationFn: async (data) => {
-            const { error } = await supabase.from('students').insert([data]);
-            if (error) throw error;
-        },
+        mutationFn: createStudent,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['students'] });
             setDialogOpen(false);
@@ -56,10 +43,7 @@ export default function Students() {
     });
 
     const updateMutation = useMutation({
-        mutationFn: async ({ id, data }) => {
-            const { error } = await supabase.from('students').update(data).eq('id', id);
-            if (error) throw error;
-        },
+        mutationFn: ({ id, data }) => updateStudent(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['students'] });
             setDialogOpen(false);
@@ -70,10 +54,7 @@ export default function Students() {
     });
 
     const deleteMutation = useMutation({
-        mutationFn: async (id) => {
-            const { error } = await supabase.from('students').delete().eq('id', id);
-            if (error) throw error;
-        },
+        mutationFn: deleteStudent,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['students'] });
             setDeleteId(null);
@@ -98,7 +79,6 @@ export default function Students() {
     });
 
     const getClassName = (classId) => classes.find(c => c.id === classId)?.name || '—';
-
     const activeCount = students.filter(s => s.status === 'Actif').length;
 
     return (
@@ -113,12 +93,8 @@ export default function Students() {
             <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Rechercher un élève..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        className="pl-9"
-                    />
+                    <Input placeholder="Rechercher un élève..." value={search}
+                        onChange={e => setSearch(e.target.value)} className="pl-9" />
                 </div>
                 <Select value={cycleFilter} onValueChange={setCycleFilter}>
                     <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
@@ -146,13 +122,10 @@ export default function Students() {
                     <p className="text-sm text-muted-foreground">Chargement...</p>
                 </div>
             ) : filtered.length === 0 ? (
-                <EmptyState
-                    icon={Users}
-                    title="Aucun élève trouvé"
+                <EmptyState icon={Users} title="Aucun élève trouvé"
                     description={search || cycleFilter !== 'all' || statusFilter !== 'all'
                         ? "Aucun résultat pour ces filtres."
-                        : "Ajoutez votre premier élève pour commencer."}
-                />
+                        : "Ajoutez votre premier élève pour commencer."} />
             ) : (
                 <div className="bg-card rounded-xl border border-border overflow-hidden">
                     <div className="overflow-x-auto">
@@ -171,7 +144,6 @@ export default function Students() {
                             <tbody>
                                 {filtered.map(s => (
                                     <tr key={s.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                                        {/* Élève avec photo */}
                                         <td className="py-3 px-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-9 h-9 rounded-full bg-muted border border-border flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -200,9 +172,11 @@ export default function Students() {
                                             </div>
                                         </td>
                                         <td className="py-3 px-4">
-                                            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${s.status === 'Actif' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' :
-                                                    s.status === 'Transféré' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400' :
-                                                        'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400'
+                                            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${s.status === 'Actif'
+                                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                                    : s.status === 'Transféré'
+                                                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                                                        : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400'
                                                 }`}>
                                                 {s.status}
                                             </span>
@@ -224,7 +198,6 @@ export default function Students() {
                             </tbody>
                         </table>
                     </div>
-                    {/* Footer table */}
                     <div className="px-4 py-3 border-t border-border bg-muted/30">
                         <p className="text-xs text-muted-foreground">
                             {filtered.length} élève{filtered.length > 1 ? 's' : ''} affiché{filtered.length > 1 ? 's' : ''}
@@ -247,7 +220,7 @@ export default function Students() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Supprimer cet élève ?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Cette action est irréversible. Toutes les données liées à cet élève seront supprimées.
+                            Cette action est irréversible. Toutes les données liées seront supprimées.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
