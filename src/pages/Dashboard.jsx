@@ -1,9 +1,8 @@
 import React from "react";
-import { supabase } from "@/api/supabaseClient";
 import { useQuery } from "@tanstack/react-query";
 import {
     Users, GraduationCap, School, TrendingUp, CalendarX, AlertTriangle,
-    ArrowUpRight, BookOpen, CheckCircle2, Clock, XCircle, MoreHorizontal
+    ArrowUpRight, BookOpen, CheckCircle2, Clock, XCircle
 } from 'lucide-react';
 import {
     AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -11,17 +10,21 @@ import {
 } from 'recharts';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-
+import { useAuth } from "@/lib/AuthContext";
+import { fetchStudents } from '@/api/students';
+import { fetchTeachers } from '@/api/teachers';
+import { fetchClasses } from '@/api/classes';
+import { fetchPayments } from '@/api/payments';
+import { fetchAbsences } from '@/api/absences';
 
 const CYCLE_COLORS = ['#8b5cf6', '#3b82f6', '#10b981'];
-const STATUS_COLORS = { 'Payé': '#10b981', 'En attente': '#f59e0b', 'Partiel': '#3b82f6' };
 
 const KPI = ({ title, value, sub, icon: Icon, accent, trend }) => (
-    <div className={`relative overflow-hidden bg-card rounded-2xl border border-border p-5 flex flex-col gap-3 hover:shadow-md transition-shadow`}>
+    <div className="relative overflow-hidden bg-card rounded-2xl border border-border p-5 flex flex-col gap-3 hover:shadow-lg transition-all duration-200 group">
         <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{title}</span>
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${accent}`}>
-                <Icon className="w-4 h-4" />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${accent} group-hover:scale-110 transition-transform duration-200`}>
+                <Icon className="w-5 h-5" />
             </div>
         </div>
         <div>
@@ -33,8 +36,7 @@ const KPI = ({ title, value, sub, icon: Icon, accent, trend }) => (
                 <ArrowUpRight className="w-3 h-3" /> {trend}
             </div>
         )}
-        {/* accent stripe */}
-        <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${accent.replace('w-9 h-9 rounded-xl flex items-center justify-center ', '')} opacity-40`} />
+        <div className={`absolute bottom-0 left-0 right-0 h-1 ${accent} opacity-30 rounded-b-2xl`} />
     </div>
 );
 
@@ -50,35 +52,21 @@ const CustomTooltip = ({ active, payload, label, formatter }) => {
     );
 };
 
-// ── helpers de fetch Supabase ──────────────────────────
-const fetchStudents = async () => { const { data } = await supabase.from('students').select('*'); return data ?? []; };
-const fetchTeachers = async () => { const { data } = await supabase.from('teachers').select('*'); return data ?? []; };
-const fetchClasses = async () => { const { data } = await supabase.from('school_classes').select('*'); return data ?? []; };
-const fetchPayments = async () => { const { data } = await supabase.from('payments').select('*'); return data ?? []; };
-const fetchAbsences = async () => { const { data } = await supabase.from('absences').select('*'); return data ?? []; };
-
-
-
 export default function Dashboard() {
-    // ← uniquement les queryFn changent
+    const { user, role } = useAuth();
+
     const { data: students = [] } = useQuery({ queryKey: ['students'], queryFn: fetchStudents });
     const { data: teachers = [] } = useQuery({ queryKey: ['teachers'], queryFn: fetchTeachers });
     const { data: classes = [] } = useQuery({ queryKey: ['classes'], queryFn: fetchClasses });
     const { data: payments = [] } = useQuery({ queryKey: ['payments'], queryFn: fetchPayments });
     const { data: absences = [] } = useQuery({ queryKey: ['absences'], queryFn: fetchAbsences });
 
-    // Calculs dérivés
     const activeStudents = students.filter(s => s.status === 'Actif');
     const activeTeachers = teachers.filter(t => t.status === 'Actif');
     const paidPayments = payments.filter(p => p.status === 'Payé');
     const totalRevenue = paidPayments.reduce((s, p) => s + (p.amount || 0), 0);
     const unjustified = absences.filter(a => !a.justified).length;
-    const unpaidStudents = [...new Set(
-        payments.filter(p => p.status !== 'Payé').map(p => p.student_id)
-    )].length;
 
-
-    // Effectifs par niveau (grouped, short labels)
     const levelMap = {
         'Petite Section': 'PS', 'Moyenne Section': 'MS', 'Grande Section': 'GS',
         'CP': 'CP', 'CE1': 'CE1', 'CE2': 'CE2', 'CM1': 'CM1', 'CM2': 'CM2',
@@ -89,15 +77,17 @@ export default function Dashboard() {
         count: activeStudents.filter(s => s.level === full).length,
     })).filter(d => d.count > 0);
 
-    // Répartition cycles
     const cycleData = ['Maternelle', 'Primaire', 'Collège'].map((c, i) => ({
         name: c,
         value: activeStudents.filter(s => s.cycle === c).length,
         color: CYCLE_COLORS[i],
     })).filter(d => d.value > 0);
 
-    // Revenus mensuels (area)
-    const MONTH_LABELS = { '01': 'Jan', '02': 'Fév', '03': 'Mar', '04': 'Avr', '05': 'Mai', '06': 'Jun', '07': 'Jul', '08': 'Aoû', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Déc' };
+    const MONTH_LABELS = {
+        '01': 'Jan', '02': 'Fév', '03': 'Mar', '04': 'Avr', '05': 'Mai',
+        '06': 'Jun', '07': 'Jul', '08': 'Aoû', '09': 'Sep', '10': 'Oct',
+        '11': 'Nov', '12': 'Déc'
+    };
     const revenueByMonth = paidPayments.reduce((acc, p) => {
         if (!p.payment_date) return acc;
         const key = MONTH_LABELS[p.payment_date.slice(5, 7)] || '?';
@@ -106,18 +96,15 @@ export default function Dashboard() {
     }, {});
     const revenueTrend = Object.entries(revenueByMonth).map(([mois, montant]) => ({ mois, montant }));
 
-    // Statut absences (donut)
     const absenceData = [
         { name: 'Justifiées', value: absences.filter(a => a.justified).length, color: '#10b981' },
         { name: 'Non justifiées', value: unjustified, color: '#ef4444' },
     ].filter(d => d.value > 0);
 
-    // Paiements récents
     const recentPayments = [...payments]
-        .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
+        .sort((a, b) => new Date(b.payment_date) - new Date(a.payment_date))
         .slice(0, 6);
 
-    // Absences récentes
     const recentAbsences = [...absences]
         .sort((a, b) => new Date(b.date) - new Date(a.date))
         .slice(0, 5);
@@ -126,11 +113,23 @@ export default function Dashboard() {
         <div className="space-y-7 pb-8">
 
             {/* Header */}
-            <div>
-                <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Tableau de bord</h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                    {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })} · Vue d'ensemble de l'établissement
-                </p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
+                        Bonjour, {user?.email?.split('@')[0]} 👋
+                    </h1>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                        Vue d'ensemble de l'établissement · Année scolaire 2025-2026
+                    </p>
+                </div>
+                <div className="hidden md:flex flex-col items-end gap-1">
+                    <span className="text-sm font-medium text-foreground capitalize">
+                        {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
+                    </span>
+                    <span className="text-xs bg-primary/10 text-primary font-semibold px-2.5 py-1 rounded-full capitalize">
+                        {role ?? 'admin'}
+                    </span>
+                </div>
             </div>
 
             {/* KPIs */}
@@ -144,15 +143,14 @@ export default function Dashboard() {
                 <KPI title="Classes" value={classes.length}
                     sub="cette année scolaire"
                     icon={School} accent="bg-violet-500/10 text-violet-600" />
-                <KPI title="Revenus encaissés" value={`${(totalRevenue / 1000).toFixed(0)} FCFA`}
+                <KPI title="Revenus encaissés"
+                    value={totalRevenue >= 1000 ? `${(totalRevenue / 1000).toFixed(0)}k FCFA` : `${totalRevenue} FCFA`}
                     sub={`${paidPayments.length} paiements`}
                     icon={TrendingUp} accent="bg-amber-500/10 text-amber-600" />
             </div>
 
             {/* Charts row 1 */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-
-                {/* Bar — effectifs */}
                 <div className="lg:col-span-2 bg-card rounded-2xl border border-border p-6">
                     <div className="flex items-center justify-between mb-5">
                         <div>
@@ -162,19 +160,25 @@ export default function Dashboard() {
                         <BookOpen className="w-4 h-4 text-muted-foreground" />
                     </div>
                     <div className="h-52">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={levelChartData} barSize={18}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={24} />
-                                <Tooltip content={<CustomTooltip formatter={v => `${v} élève${v > 1 ? 's' : ''}`} />} cursor={{ fill: 'hsl(var(--muted)/0.4)' }} />
-                                <Bar dataKey="count" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} name="Élèves" />
-                            </BarChart>
-                        </ResponsiveContainer>
+                        {levelChartData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={levelChartData} barSize={18}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={24} />
+                                    <Tooltip content={<CustomTooltip formatter={v => `${v} élève${v > 1 ? 's' : ''}`} />} />
+                                    <Bar dataKey="count" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} name="Élèves" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                                <BookOpen className="w-10 h-10 opacity-20" />
+                                <p className="text-sm">Aucun élève enregistré</p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Pie — cycles */}
                 <div className="bg-card rounded-2xl border border-border p-6 flex flex-col">
                     <div className="flex items-center justify-between mb-5">
                         <div>
@@ -214,7 +218,10 @@ export default function Dashboard() {
                                 </div>
                             </div>
                         ) : (
-                            <p className="text-sm text-muted-foreground">Aucune donnée</p>
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                                <Users className="w-10 h-10 opacity-20" />
+                                <p className="text-sm">Aucune donnée</p>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -222,8 +229,6 @@ export default function Dashboard() {
 
             {/* Charts row 2 */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-
-                {/* Area — revenus */}
                 <div className="lg:col-span-2 bg-card rounded-2xl border border-border p-6">
                     <div className="flex items-center justify-between mb-5">
                         <div>
@@ -254,13 +259,13 @@ export default function Dashboard() {
                             </ResponsiveContainer>
                         </div>
                     ) : (
-                        <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">
-                            Aucun paiement enregistré
+                        <div className="h-48 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                            <TrendingUp className="w-10 h-10 opacity-20" />
+                            <p className="text-sm">Aucun paiement enregistré</p>
                         </div>
                     )}
                 </div>
 
-                {/* Absences donut */}
                 <div className="bg-card rounded-2xl border border-border p-6 flex flex-col">
                     <div className="flex items-center justify-between mb-5">
                         <div>
@@ -295,18 +300,16 @@ export default function Dashboard() {
                             </div>
                         </div>
                     ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center gap-2 text-emerald-600">
+                        <div className="flex-1 flex flex-col items-center justify-center gap-2">
                             <CheckCircle2 className="w-10 h-10 text-emerald-500" />
-                            <p className="text-sm font-medium">Aucune absence</p>
+                            <p className="text-sm font-medium text-emerald-600">Aucune absence</p>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Bottom row: recent payments + recent absences */}
+            {/* Bottom row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-                {/* Recent payments */}
                 <div className="bg-card rounded-2xl border border-border p-6">
                     <div className="flex items-center justify-between mb-5">
                         <div>
@@ -316,13 +319,17 @@ export default function Dashboard() {
                         <TrendingUp className="w-4 h-4 text-muted-foreground" />
                     </div>
                     {recentPayments.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-10">Aucun paiement enregistré</p>
+                        <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground">
+                            <TrendingUp className="w-10 h-10 opacity-20" />
+                            <p className="text-sm">Aucun paiement enregistré</p>
+                        </div>
                     ) : (
                         <div className="space-y-1">
                             {recentPayments.map(p => (
                                 <div key={p.id} className="flex items-center justify-between py-2.5 px-2 rounded-xl hover:bg-muted/40 transition-colors">
                                     <div className="flex items-center gap-3 min-w-0">
-                                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${p.status === 'Payé' ? 'bg-emerald-100' : p.status === 'Partiel' ? 'bg-blue-100' : 'bg-amber-100'
+                                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${p.status === 'Payé' ? 'bg-emerald-100' :
+                                                p.status === 'Partiel' ? 'bg-blue-100' : 'bg-amber-100'
                                             }`}>
                                             {p.status === 'Payé'
                                                 ? <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -336,8 +343,9 @@ export default function Dashboard() {
                                         </div>
                                     </div>
                                     <div className="text-right flex-shrink-0 ml-3">
-                                        <p className="text-sm font-bold text-foreground">{(p.amount || 0).toLocaleString()} F</p>
-                                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${p.status === 'Payé' ? 'text-emerald-700' : p.status === 'Partiel' ? 'text-blue-700' : 'text-amber-700'
+                                        <p className="text-sm font-bold text-foreground">{(p.amount || 0).toLocaleString()} FCFA</p>
+                                        <span className={`text-xs font-medium ${p.status === 'Payé' ? 'text-emerald-700' :
+                                                p.status === 'Partiel' ? 'text-blue-700' : 'text-amber-700'
                                             }`}>{p.status}</span>
                                     </div>
                                 </div>
@@ -346,7 +354,6 @@ export default function Dashboard() {
                     )}
                 </div>
 
-                {/* Recent absences */}
                 <div className="bg-card rounded-2xl border border-border p-6">
                     <div className="flex items-center justify-between mb-5">
                         <div>
@@ -356,7 +363,7 @@ export default function Dashboard() {
                         <CalendarX className="w-4 h-4 text-muted-foreground" />
                     </div>
                     {recentAbsences.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-10 gap-2 text-emerald-600">
+                        <div className="flex flex-col items-center justify-center py-10 gap-2">
                             <CheckCircle2 className="w-10 h-10 text-emerald-400" />
                             <p className="text-sm font-medium text-muted-foreground">Aucune absence récente</p>
                         </div>
