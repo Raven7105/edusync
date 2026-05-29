@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/api/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -13,6 +12,8 @@ import PageHeader from '@/components/shared/PageHeader';
 import EmptyState from '@/components/shared/EmptyState';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import toast from 'react-hot-toast';
+import { fetchTeachers, createTeacher, updateTeacher, deleteTeacher } from '@/api/teachers';
+import { supabase } from '@/api/supabaseClient';
 
 const SUBJECTS = [
     'Français', 'Mathématiques', 'Sciences', 'Histoire-Géo', 'Anglais',
@@ -51,12 +52,10 @@ function TeacherForm({ teacher, open, onOpenChange, onSave }) {
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
             const filePath = `teacher-photos/${fileName}`;
             const { error: uploadError } = await supabase.storage
-                .from('documents')
-                .upload(filePath, file);
+                .from('documents').upload(filePath, file);
             if (uploadError) throw uploadError;
             const { data: publicUrlData } = supabase.storage
-                .from('documents')
-                .getPublicUrl(filePath);
+                .from('documents').getPublicUrl(filePath);
             set('photo_url', publicUrlData.publicUrl);
             toast.success('Photo uploadée');
         } catch {
@@ -89,7 +88,6 @@ function TeacherForm({ teacher, open, onOpenChange, onSave }) {
                 <DialogHeader>
                     <DialogTitle>{teacher ? "Modifier l'enseignant" : "Nouvel enseignant"}</DialogTitle>
                 </DialogHeader>
-
                 <form onSubmit={handleSubmit} className="space-y-5">
 
                     {/* Photo */}
@@ -108,7 +106,8 @@ function TeacherForm({ teacher, open, onOpenChange, onSave }) {
                                     <Upload className="w-3.5 h-3.5" />
                                     {uploading ? 'Envoi...' : 'Choisir une photo'}
                                 </span>
-                                <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
+                                <input type="file" accept="image/*" className="hidden"
+                                    onChange={handlePhotoUpload} disabled={uploading} />
                             </label>
                             {form.photo_url && (
                                 <button type="button" onClick={() => set('photo_url', '')}
@@ -125,23 +124,32 @@ function TeacherForm({ teacher, open, onOpenChange, onSave }) {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <Label>Prénom *</Label>
-                                <Input value={form.first_name} onChange={e => set('first_name', e.target.value)} required placeholder="Ex: Jean" />
+                                <Input value={form.first_name}
+                                    onChange={e => set('first_name', e.target.value)}
+                                    required placeholder="Ex: Jean" />
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Nom *</Label>
-                                <Input value={form.last_name} onChange={e => set('last_name', e.target.value)} required placeholder="Ex: Dupont" />
+                                <Input value={form.last_name}
+                                    onChange={e => set('last_name', e.target.value)}
+                                    required placeholder="Ex: Dupont" />
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Téléphone</Label>
-                                <Input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+228 90 00 00 00" />
+                                <Input value={form.phone}
+                                    onChange={e => set('phone', e.target.value)}
+                                    placeholder="+228 90 00 00 00" />
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Email</Label>
-                                <Input type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="prof@email.com" />
+                                <Input type="email" value={form.email}
+                                    onChange={e => set('email', e.target.value)}
+                                    placeholder="prof@email.com" />
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Date d'embauche</Label>
-                                <Input type="date" value={form.hire_date} onChange={e => set('hire_date', e.target.value)} />
+                                <Input type="date" value={form.hire_date}
+                                    onChange={e => set('hire_date', e.target.value)} />
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Statut</Label>
@@ -191,7 +199,8 @@ function TeacherForm({ teacher, open, onOpenChange, onSave }) {
 
                     {/* Boutons */}
                     <div className="flex justify-end gap-3 pt-2 border-t border-border">
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+                        <Button type="button" variant="outline"
+                            onClick={() => onOpenChange(false)} disabled={saving}>
                             Annuler
                         </Button>
                         <Button type="submit" disabled={!isValid || saving}>
@@ -214,21 +223,11 @@ export default function Teachers() {
 
     const { data: teachers = [], isLoading } = useQuery({
         queryKey: ['teachers'],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from('teachers')
-                .select('*')
-                .order('created_at', { ascending: false });
-            if (error) throw error;
-            return data || [];
-        },
+        queryFn: fetchTeachers,
     });
 
     const createMut = useMutation({
-        mutationFn: async (data) => {
-            const { error } = await supabase.from('teachers').insert([data]);
-            if (error) throw error;
-        },
+        mutationFn: createTeacher,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['teachers'] });
             setDialogOpen(false);
@@ -238,10 +237,7 @@ export default function Teachers() {
     });
 
     const updateMut = useMutation({
-        mutationFn: async ({ id, data }) => {
-            const { error } = await supabase.from('teachers').update(data).eq('id', id);
-            if (error) throw error;
-        },
+        mutationFn: ({ id, data }) => updateTeacher(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['teachers'] });
             setDialogOpen(false);
@@ -252,10 +248,7 @@ export default function Teachers() {
     });
 
     const deleteMut = useMutation({
-        mutationFn: async (id) => {
-            const { error } = await supabase.from('teachers').delete().eq('id', id);
-            if (error) throw error;
-        },
+        mutationFn: deleteTeacher,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['teachers'] });
             setDeleteId(null);
@@ -321,7 +314,6 @@ export default function Teachers() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {filtered.map(t => (
                             <div key={t.id} className="bg-card rounded-xl border border-border p-5 hover:shadow-lg transition-all duration-200">
-                                {/* Header carte */}
                                 <div className="flex items-start gap-3 mb-3">
                                     <div className="w-12 h-12 rounded-full bg-muted border border-border overflow-hidden flex items-center justify-center flex-shrink-0">
                                         {t.photo_url
@@ -337,8 +329,8 @@ export default function Teachers() {
                                                 {t.first_name} {t.last_name}
                                             </h3>
                                             <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${t.status === 'Actif'
-                                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
-                                                : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400'
+                                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                                    : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400'
                                                 }`}>{t.status}</span>
                                         </div>
                                         {t.email && <p className="text-xs text-muted-foreground truncate">{t.email}</p>}
@@ -346,7 +338,6 @@ export default function Teachers() {
                                     </div>
                                 </div>
 
-                                {/* Cycles */}
                                 {t.cycles?.length > 0 && (
                                     <div className="flex gap-1.5 flex-wrap mb-2">
                                         {t.cycles.map(c => (
@@ -355,7 +346,6 @@ export default function Teachers() {
                                     </div>
                                 )}
 
-                                {/* Matières */}
                                 {t.subjects?.length > 0 && (
                                     <div className="flex gap-1 flex-wrap mb-3">
                                         {t.subjects.slice(0, 4).map(s => (
@@ -367,7 +357,6 @@ export default function Teachers() {
                                     </div>
                                 )}
 
-                                {/* Actions */}
                                 <div className="flex justify-end gap-1 border-t border-border pt-3 mt-3">
                                     <Button size="sm" variant="ghost"
                                         onClick={() => { setEditing(t); setDialogOpen(true); }}>
@@ -380,8 +369,6 @@ export default function Teachers() {
                             </div>
                         ))}
                     </div>
-
-                    {/* Footer */}
                     <p className="text-xs text-muted-foreground">
                         {filtered.length} enseignant{filtered.length > 1 ? 's' : ''} affiché{filtered.length > 1 ? 's' : ''}
                         {filtered.length !== teachers.length && ` sur ${teachers.length}`}

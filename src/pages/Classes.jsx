@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/api/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +11,9 @@ import CycleBadge from '@/components/shared/CycleBadge';
 import EmptyState from '@/components/shared/EmptyState';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import toast from 'react-hot-toast';
+import { fetchClasses, createClass, updateClass, deleteClass } from '@/api/classes';
+import { fetchTeachers } from '@/api/teachers';
+import { fetchStudents } from '@/api/students';
 
 const LEVELS_BY_CYCLE = {
     Maternelle: ['Petite Section', 'Moyenne Section', 'Grande Section'],
@@ -35,45 +37,21 @@ export default function Classes() {
 
     const { data: classes = [], isLoading } = useQuery({
         queryKey: ['classes'],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from('school_classes')
-                .select('*')
-                .order('cycle', { ascending: true });
-            if (error) throw error;
-            return data || [];
-        },
+        queryFn: fetchClasses,
     });
 
     const { data: teachers = [] } = useQuery({
         queryKey: ['teachers'],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from('teachers')
-                .select('*')
-                .order('last_name', { ascending: true });
-            if (error) throw error;
-            return data || [];
-        },
+        queryFn: fetchTeachers,
     });
 
     const { data: students = [] } = useQuery({
         queryKey: ['students'],
-        queryFn: async () => {
-            const { data, error } = await supabase.from('students').select('id, class_id');
-            if (error) throw error;
-            return data || [];
-        },
+        queryFn: fetchStudents,
     });
 
     const createMut = useMutation({
-        mutationFn: async (newClass) => {
-            const { error } = await supabase.from('school_classes').insert([{
-                ...newClass,
-                teacher_id: newClass.teacher_id || null,
-            }]);
-            if (error) throw error;
-        },
+        mutationFn: createClass,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['classes'] });
             setDialogOpen(false);
@@ -84,13 +62,7 @@ export default function Classes() {
     });
 
     const updateMut = useMutation({
-        mutationFn: async ({ id, data }) => {
-            const { error } = await supabase.from('school_classes').update({
-                ...data,
-                teacher_id: data.teacher_id || null,
-            }).eq('id', id);
-            if (error) throw error;
-        },
+        mutationFn: ({ id, data }) => updateClass(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['classes'] });
             setDialogOpen(false);
@@ -102,10 +74,7 @@ export default function Classes() {
     });
 
     const deleteMut = useMutation({
-        mutationFn: async (id) => {
-            const { error } = await supabase.from('school_classes').delete().eq('id', id);
-            if (error) throw error;
-        },
+        mutationFn: deleteClass,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['classes'] });
             setDeleteId(null);
@@ -136,10 +105,14 @@ export default function Classes() {
 
     const handleSave = (e) => {
         e.preventDefault();
+        const payload = {
+            ...form,
+            teacher_id: form.teacher_id || null,
+        };
         if (editing) {
-            updateMut.mutate({ id: editing.id, data: form });
+            updateMut.mutate({ id: editing.id, data: payload });
         } else {
-            createMut.mutate(form);
+            createMut.mutate(payload);
         }
     };
 
@@ -158,7 +131,7 @@ export default function Classes() {
 
     return (
         <div className="space-y-6">
-            <PageHeader title="Classes" subtitle={`${classes.length} classes · Année ${form.school_year}`}>
+            <PageHeader title="Classes" subtitle={`${classes.length} classes`}>
                 <Button onClick={openNew}>
                     <Plus className="w-4 h-4 mr-2" /> Nouvelle classe
                 </Button>
@@ -203,8 +176,6 @@ export default function Classes() {
 
                             return (
                                 <div key={c.id} className="bg-card rounded-xl border border-border p-5 hover:shadow-lg transition-all duration-200">
-
-                                    {/* Header */}
                                     <div className="flex items-start justify-between mb-3">
                                         <div>
                                             <h3 className="font-bold text-xl text-foreground">{c.name}</h3>
@@ -213,7 +184,6 @@ export default function Classes() {
                                         <CycleBadge cycle={c.cycle} />
                                     </div>
 
-                                    {/* Infos */}
                                     <div className="space-y-2 text-sm mb-4">
                                         <div className="flex justify-between">
                                             <span className="text-muted-foreground">Enseignant</span>
@@ -227,7 +197,6 @@ export default function Classes() {
                                         )}
                                     </div>
 
-                                    {/* Effectif avec barre */}
                                     <div className="mb-4">
                                         <div className="flex justify-between text-sm mb-1.5">
                                             <span className="text-muted-foreground flex items-center gap-1">
@@ -239,13 +208,14 @@ export default function Classes() {
                                         </div>
                                         <div className="w-full bg-muted rounded-full h-2">
                                             <div
-                                                className={`rounded-full h-2 transition-all duration-300 ${isFull ? 'bg-red-500' : fillPercent > 80 ? 'bg-amber-500' : 'bg-primary'}`}
+                                                className={`rounded-full h-2 transition-all duration-300 ${isFull ? 'bg-red-500' :
+                                                        fillPercent > 80 ? 'bg-amber-500' : 'bg-primary'
+                                                    }`}
                                                 style={{ width: `${fillPercent}%` }}
                                             />
                                         </div>
                                     </div>
 
-                                    {/* Actions */}
                                     <div className="flex justify-end gap-1 border-t border-border pt-3">
                                         <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>
                                             <Pencil className="w-3.5 h-3.5 mr-1" /> Modifier
@@ -258,8 +228,6 @@ export default function Classes() {
                             );
                         })}
                     </div>
-
-                    {/* Footer */}
                     <p className="text-xs text-muted-foreground">
                         {filtered.length} classe{filtered.length > 1 ? 's' : ''} affichée{filtered.length > 1 ? 's' : ''}
                         {filtered.length !== classes.length && ` sur ${classes.length}`}
@@ -267,7 +235,7 @@ export default function Classes() {
                 </>
             )}
 
-            {/* Dialog formulaire */}
+            {/* Dialog */}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
@@ -277,12 +245,14 @@ export default function Classes() {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <Label>Nom *</Label>
-                                <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+                                <Input value={form.name}
+                                    onChange={e => setForm({ ...form, name: e.target.value })}
                                     placeholder="Ex: CP-A" required />
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Année scolaire</Label>
-                                <Input value={form.school_year} onChange={e => setForm({ ...form, school_year: e.target.value })} />
+                                <Input value={form.school_year}
+                                    onChange={e => setForm({ ...form, school_year: e.target.value })} />
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Cycle</Label>
@@ -299,7 +269,8 @@ export default function Classes() {
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Niveau</Label>
-                                <Select value={form.level} onValueChange={v => setForm({ ...form, level: v })}>
+                                <Select value={form.level}
+                                    onValueChange={v => setForm({ ...form, level: v })}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {LEVELS_BY_CYCLE[form.cycle]?.map(l => (
@@ -310,7 +281,8 @@ export default function Classes() {
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Enseignant principal</Label>
-                                <Select value={form.teacher_id} onValueChange={v => setForm({ ...form, teacher_id: v })}>
+                                <Select value={form.teacher_id}
+                                    onValueChange={v => setForm({ ...form, teacher_id: v })}>
                                     <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                                     <SelectContent>
                                         {teachers.filter(t => t.status === 'Actif').map(t => (
@@ -328,12 +300,14 @@ export default function Classes() {
                             </div>
                             <div className="space-y-1.5 col-span-2">
                                 <Label>Salle</Label>
-                                <Input value={form.room} onChange={e => setForm({ ...form, room: e.target.value })}
+                                <Input value={form.room}
+                                    onChange={e => setForm({ ...form, room: e.target.value })}
                                     placeholder="Ex: Salle 12" />
                             </div>
                         </div>
                         <div className="flex justify-end gap-3 pt-2 border-t border-border">
-                            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
+                            <Button type="button" variant="outline"
+                                onClick={() => setDialogOpen(false)}>Annuler</Button>
                             <Button type="submit" disabled={!form.name.trim()}>
                                 {editing ? 'Enregistrer' : 'Créer'}
                             </Button>
@@ -342,13 +316,12 @@ export default function Classes() {
                 </DialogContent>
             </Dialog>
 
-            {/* Dialog suppression */}
             <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Supprimer cette classe ?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Cette action est irréversible. Les élèves de cette classe ne seront pas supprimés.
+                            Cette action est irréversible. Les élèves ne seront pas supprimés.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
