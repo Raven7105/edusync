@@ -11,6 +11,7 @@ import Students from './pages/Students'
 import Teachers from './pages/Teachers'
 import Classes from './pages/Classes'
 import Grades from './pages/Grades'
+import Absences from './pages/Absences'
 
 const queryClient = new QueryClient()
 
@@ -51,6 +52,7 @@ function App() {
                 <Route path="/enseignants" element={<Teachers />} />
                 <Route path="/classes" element={<Classes />} />
                 <Route path="/notes" element={<Grades />} />
+                <Route path="/absences" element={<Absences />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Route>
             )}
