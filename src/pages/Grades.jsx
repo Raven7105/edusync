@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/api/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +11,9 @@ import PageHeader from '@/components/shared/PageHeader';
 import EmptyState from '@/components/shared/EmptyState';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import toast from 'react-hot-toast';
+import { fetchGrades, createGrade, updateGrade, deleteGrade } from '@/api/grades';
+import { fetchStudents } from '@/api/students';
+import { fetchTeachers } from '@/api/teachers';
 
 const SUBJECTS = [
     'Français', 'Mathématiques', 'Sciences', 'Histoire-Géo', 'Anglais',
@@ -32,7 +34,6 @@ const EMPTY_FORM = {
 
 function calcAutoGrade(f, college) {
     const hasVal = v => v !== '' && v !== null && v !== undefined;
-
     if (college) {
         const parts = [];
         if (hasVal(f.note_evaluation)) parts.push({ v: Number(f.note_evaluation), c: 1 });
@@ -43,8 +44,6 @@ function calcAutoGrade(f, college) {
         const totalVal = parts.reduce((s, p) => s + p.v * p.c, 0);
         return parseFloat((totalVal / totalCoef).toFixed(2));
     }
-
-    // Primaire/Maternelle : seulement évaluation + composition
     const vals = [f.note_evaluation, f.note_examen].filter(hasVal).map(Number);
     if (!vals.length) return '';
     return parseFloat((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2));
@@ -69,33 +68,21 @@ export default function Grades() {
 
     const { data: grades = [], isLoading } = useQuery({
         queryKey: ['grades'],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from('grades')
-                .select('*')
-                .order('created_at', { ascending: false });
-            if (error) throw error;
-            return data || [];
-        },
+        queryFn: fetchGrades,
     });
 
     const { data: students = [] } = useQuery({
         queryKey: ['students'],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from('students')
-                .select('*')
-                .order('last_name', { ascending: true });
-            if (error) throw error;
-            return data || [];
-        },
+        queryFn: fetchStudents,
+    });
+
+    const { data: teachers = [] } = useQuery({
+        queryKey: ['teachers'],
+        queryFn: fetchTeachers,
     });
 
     const createMut = useMutation({
-        mutationFn: async (payload) => {
-            const { error } = await supabase.from('grades').insert([payload]);
-            if (error) throw error;
-        },
+        mutationFn: createGrade,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['grades'] });
             closeDialog();
@@ -105,10 +92,7 @@ export default function Grades() {
     });
 
     const updateMut = useMutation({
-        mutationFn: async ({ id, payload }) => {
-            const { error } = await supabase.from('grades').update(payload).eq('id', id);
-            if (error) throw error;
-        },
+        mutationFn: ({ id, payload }) => updateGrade(id, payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['grades'] });
             closeDialog();
@@ -118,10 +102,7 @@ export default function Grades() {
     });
 
     const deleteMut = useMutation({
-        mutationFn: async (id) => {
-            const { error } = await supabase.from('grades').delete().eq('id', id);
-            if (error) throw error;
-        },
+        mutationFn: deleteGrade,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['grades'] });
             setDeleteId(null);
@@ -180,6 +161,10 @@ export default function Grades() {
     const college = isCollege(form.cycle);
     const autoGrade = calcAutoGrade(form, college);
 
+    const suggestedTeachers = teachers.filter(t =>
+        t.status === 'Actif' && t.subjects?.includes(form.subject)
+    );
+
     const handleSave = async (e) => {
         e.preventDefault();
         if (!form.student_id) { toast.error('Sélectionnez un élève'); return; }
@@ -196,7 +181,9 @@ export default function Grades() {
             }
         }
 
-        const finalGrade = form.grade !== '' ? parseFloat(form.grade) : (autoGrade !== '' ? autoGrade : 0);
+        const finalGrade = form.grade !== ''
+            ? parseFloat(form.grade)
+            : (autoGrade !== '' ? autoGrade : 0);
 
         const { cycle, ...formWithoutCycle } = form;
 
@@ -223,15 +210,6 @@ export default function Grades() {
         const matchTrimester = trimesterFilter === 'all' || g.trimester === trimesterFilter;
         const matchSubject = subjectFilter === 'all' || g.subject === subjectFilter;
         return matchSearch && matchTrimester && matchSubject;
-    });
-
-    const { data: teachers = [] } = useQuery({
-        queryKey: ['teachers'],
-        queryFn: async () => {
-            const { data, error } = await supabase.from('teachers').select('*');
-            if (error) throw error;
-            return data || [];
-        },
     });
 
     const isPending = createMut.isPending || updateMut.isPending || deleteMut.isPending;
@@ -368,24 +346,23 @@ export default function Grades() {
                             {form.cycle && (
                                 <p className="text-xs text-muted-foreground">
                                     Cycle : <strong>{form.cycle}</strong> →
-                                    {college ? ' Collège (Éval · Devoir · Composition)' : ' Primaire/Maternelle (Évaluation · Composition)'}
+                                    {college
+                                        ? ' Collège (Éval · Devoir · Composition)'
+                                        : ' Primaire/Maternelle (Évaluation · Composition)'}
                                 </p>
                             )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
-                            {/* Matière */}
                             <div className="space-y-1.5">
                                 <Label>Matière *</Label>
-                                <Select value={form.subject} onValueChange={v => setForm(f => ({ ...f, subject: v }))}>
+                                <Select value={form.subject} onValueChange={v => setForm(f => ({ ...f, subject: v, teacher_name: '' }))}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {SUBJECTS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
-
-                            {/* Trimestre */}
                             <div className="space-y-1.5">
                                 <Label>Trimestre</Label>
                                 <Select value={form.trimester} onValueChange={v => setForm(f => ({ ...f, trimester: v }))}>
@@ -397,6 +374,7 @@ export default function Grades() {
                                     </SelectContent>
                                 </Select>
                             </div>
+
                             {/* Professeur */}
                             <div className="space-y-1.5 col-span-2">
                                 <Label>Professeur</Label>
@@ -408,21 +386,16 @@ export default function Grades() {
                                         <SelectValue placeholder="Sélectionner un professeur" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {teachers
-                                            .filter(t =>
-                                                t.status === 'Actif' &&
-                                                t.subjects?.includes(form.subject)
-                                            )
-                                            .map(t => (
+                                        {suggestedTeachers.length === 0 ? (
+                                            <SelectItem value="none" disabled>
+                                                Aucun prof pour cette matière
+                                            </SelectItem>
+                                        ) : (
+                                            suggestedTeachers.map(t => (
                                                 <SelectItem key={t.id} value={`${t.first_name} ${t.last_name}`}>
                                                     {t.first_name} {t.last_name}
                                                 </SelectItem>
                                             ))
-                                        }
-                                        {teachers.filter(t => t.status === 'Actif' && t.subjects?.includes(form.subject)).length === 0 && (
-                                            <SelectItem value="none" disabled>
-                                                Aucun prof pour cette matière
-                                            </SelectItem>
                                         )}
                                     </SelectContent>
                                 </Select>
@@ -436,7 +409,6 @@ export default function Grades() {
                             </p>
 
                             {college ? (
-                                // Collège : Éval + Devoir + Composition avec coefs
                                 <div className="space-y-3">
                                     <div className="grid grid-cols-4 gap-2 items-end">
                                         <div className="col-span-3 space-y-1">
@@ -485,7 +457,6 @@ export default function Grades() {
                                     </div>
                                 </div>
                             ) : (
-                                // Primaire/Maternelle : Évaluation + Composition seulement
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-1">
                                         <Label className="text-xs">Évaluation /20</Label>
@@ -504,28 +475,19 @@ export default function Grades() {
                                 </div>
                             )}
 
-                            {/* Moyenne calculée */}
                             {autoGrade !== '' && (
                                 <div className="border-t border-border/50 pt-2">
                                     <p className="text-xs font-semibold text-primary">
                                         Moyenne calculée : <strong>{autoGrade}/20</strong>
-                                        {college && (
-                                            <span className="text-muted-foreground font-normal ml-1">
-                                                = Σ(note × coef) / Σcoef
-                                            </span>
-                                        )}
-                                        {!college && (
-                                            <span className="text-muted-foreground font-normal ml-1">
-                                                = (Éval + Comp) / nb notes
-                                            </span>
-                                        )}
+                                        <span className="text-muted-foreground font-normal ml-1">
+                                            {college ? '= Σ(note × coef) / Σcoef' : '= (Éval + Comp) / nb notes'}
+                                        </span>
                                     </p>
                                 </div>
                             )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
-                            {/* Moyenne manuelle */}
                             <div className="space-y-1.5">
                                 <Label>
                                     Moy. matière /20
@@ -536,8 +498,6 @@ export default function Grades() {
                                     onChange={e => setForm(f => ({ ...f, grade: e.target.value }))}
                                     placeholder={autoGrade !== '' ? String(autoGrade) : 'auto'} />
                             </div>
-
-                            {/* Coefficient matière */}
                             <div className="space-y-1.5">
                                 <Label>Coefficient matière</Label>
                                 <Input type="number" min="1" value={form.coefficient}
@@ -545,7 +505,6 @@ export default function Grades() {
                             </div>
                         </div>
 
-                        {/* Appréciation */}
                         <div className="space-y-1.5">
                             <Label>Appréciation</Label>
                             <Textarea value={form.comment}
@@ -563,7 +522,6 @@ export default function Grades() {
                 </DialogContent>
             </Dialog>
 
-            {/* Suppression */}
             <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
