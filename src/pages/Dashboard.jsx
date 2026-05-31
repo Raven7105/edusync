@@ -329,7 +329,7 @@ export default function Dashboard() {
                                 <div key={p.id} className="flex items-center justify-between py-2.5 px-2 rounded-xl hover:bg-muted/40 transition-colors">
                                     <div className="flex items-center gap-3 min-w-0">
                                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${p.status === 'Payé' ? 'bg-emerald-100' :
-                                                p.status === 'Partiel' ? 'bg-blue-100' : 'bg-amber-100'
+                                            p.status === 'Partiel' ? 'bg-blue-100' : 'bg-amber-100'
                                             }`}>
                                             {p.status === 'Payé'
                                                 ? <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -345,7 +345,7 @@ export default function Dashboard() {
                                     <div className="text-right flex-shrink-0 ml-3">
                                         <p className="text-sm font-bold text-foreground">{(p.amount || 0).toLocaleString()} FCFA</p>
                                         <span className={`text-xs font-medium ${p.status === 'Payé' ? 'text-emerald-700' :
-                                                p.status === 'Partiel' ? 'text-blue-700' : 'text-amber-700'
+                                            p.status === 'Partiel' ? 'text-blue-700' : 'text-amber-700'
                                             }`}>{p.status}</span>
                                     </div>
                                 </div>
