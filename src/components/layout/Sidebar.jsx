@@ -14,10 +14,8 @@ const navItems = [
     { label: 'Classes', icon: School, path: '/classes' },
     { label: 'Notes', icon: ClipboardList, path: '/notes' },
     { label: 'Absences', icon: CalendarX, path: '/absences' },
-    { label: 'Emploi du temps', icon: Calendar, path: '/emploi-du-temps' },
     { label: 'Paiements', icon: CreditCard, path: '/paiements' },
     { label: 'Rapports', icon: BarChart2, path: '/rapports' },
-    { label: 'Bulletins PDF', icon: FileText, path: '/bulletins' },
     { label: 'Messages', icon: MessageSquare, path: '/messages', badge: true },
     { label: 'Aperçu portails', icon: Eye, path: '/apercu' },
     { label: 'Paramètres école', icon: Settings2, path: '/parametres' },
@@ -76,7 +74,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
                     </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 p-3 space-y-5 overflow-y-auto">
+                <nav className="flex-1 p-3 space-y-8 overflow-y-auto">
                     {navItems.map((item) => {
                         const isActive = location.pathname === item.path;
                         return (
