@@ -274,6 +274,11 @@ export default function Payments() {
         return matchSearch && matchStatus && matchType;
     });
 
+    const [unpaidPage, setUnpaidPage] = useState(1);
+    const [unpaidCycleFilter, setUnpaidCycleFilter] = useState('all');
+    const [unpaidSort, setUnpaidSort] = useState('desc');
+    const ITEMS_PER_PAGE = 10;
+
     // Impayés
     const unpaidStudents = students
         .filter(s => s.status === 'Actif')
@@ -288,9 +293,13 @@ export default function Payments() {
             return { ...s, totalDue, totalPaidByStudent, remaining, unpaidPayments };
         })
         .filter(s => s.remaining > 0)
-        .filter(s => `${s.first_name} ${s.last_name}`.toLowerCase().includes(unpaidSearch.toLowerCase()));
+        .filter(s => `${s.first_name} ${s.last_name}`.toLowerCase().includes(unpaidSearch.toLowerCase()))
+        .filter(s => unpaidCycleFilter === 'all' || s.cycle === unpaidCycleFilter)
+        .sort((a, b) => unpaidSort === 'desc' ? b.remaining - a.remaining : a.remaining - b.remaining);
 
     const grandTotal = unpaidStudents.reduce((acc, s) => acc + s.remaining, 0);
+    const totalPages = Math.ceil(unpaidStudents.length / ITEMS_PER_PAGE);
+    const paginatedUnpaid = unpaidStudents.slice((unpaidPage - 1) * ITEMS_PER_PAGE, unpaidPage * ITEMS_PER_PAGE);
 
     // Évolution par classe
     const classStudents = selectedClassId ? students.filter(s => s.class_id === selectedClassId) : [];
@@ -556,20 +565,49 @@ export default function Payments() {
                         </div>
                     )}
                 </TabsContent>
-
-                {/* Tab 3: Impayés */}
                 {/* Tab 3: Impayés */}
                 <TabsContent value="unpaid" className="space-y-4">
-                    <div className="flex items-center justify-between flex-wrap gap-3">
-                        <p className="text-sm text-muted-foreground">
-                            <span className="font-semibold text-red-600">{unpaidStudents.length}</span> élève(s) ·{' '}
-                            <span className="font-semibold text-red-600">{grandTotal.toLocaleString()} FCFA</span> en attente
-                        </p>
-                        <div className="relative w-64">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                            <Input placeholder="Rechercher..." value={unpaidSearch}
-                                onChange={e => setUnpaidSearch(e.target.value)} className="pl-9" />
+                    {/* Header stats */}
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl p-4">
+                            <p className="text-xs text-red-600 font-medium uppercase tracking-wide">Élèves concernés</p>
+                            <p className="text-2xl font-extrabold text-red-600 mt-1">{unpaidStudents.length}</p>
                         </div>
+                        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-xl p-4">
+                            <p className="text-xs text-amber-600 font-medium uppercase tracking-wide">Total restant dû</p>
+                            <p className="text-2xl font-extrabold text-amber-600 mt-1">{grandTotal.toLocaleString()} FCFA</p>
+                        </div>
+                        <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 rounded-xl p-4">
+                            <p className="text-xs text-emerald-600 font-medium uppercase tracking-wide">Taux de recouvrement</p>
+                            <p className="text-2xl font-extrabold text-emerald-600 mt-1">
+                                {students.filter(s => s.status === 'Actif').length > 0
+                                    ? `${Math.round(((students.filter(s => s.status === 'Actif').length - unpaidStudents.length) / students.filter(s => s.status === 'Actif').length) * 100)}%`
+                                    : '0%'}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Filtres */}
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input placeholder="Rechercher un élève..." value={unpaidSearch}
+                                onChange={e => { setUnpaidSearch(e.target.value); setUnpaidPage(1); }} className="pl-9" />
+                        </div>
+                        <Select value={unpaidCycleFilter} onValueChange={v => { setUnpaidCycleFilter(v); setUnpaidPage(1); }}>
+                            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Tous les cycles</SelectItem>
+                                {CYCLES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <Select value={unpaidSort} onValueChange={setUnpaidSort}>
+                            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="desc">Plus élevé d'abord</SelectItem>
+                                <SelectItem value="asc">Plus faible d'abord</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     {unpaidStudents.length === 0 ? (
@@ -579,62 +617,90 @@ export default function Payments() {
                             <p className="text-emerald-600 dark:text-emerald-500 text-sm mt-1">Tous les élèves sont à jour.</p>
                         </div>
                     ) : (
-                        <div className="space-y-3">
-                            {unpaidStudents.map(s => (
-                                <div key={s.id} className="bg-card border border-border rounded-2xl p-5">
-                                    <div className="flex items-start justify-between gap-4 flex-wrap">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-950/40 flex items-center justify-center shrink-0">
-                                                {s.photo_url
-                                                    ? <img src={s.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
-                                                    : <AlertTriangle className="w-5 h-5 text-red-500" />}
+                        <>
+                            <div className="space-y-3">
+                                {paginatedUnpaid.map(s => (
+                                    <div key={s.id} className="bg-card border border-border rounded-2xl p-5">
+                                        <div className="flex items-start justify-between gap-4 flex-wrap">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-950/40 flex items-center justify-center shrink-0">
+                                                    {s.photo_url
+                                                        ? <img src={s.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
+                                                        : <AlertTriangle className="w-5 h-5 text-red-500" />}
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-foreground">{s.first_name} {s.last_name}</p>
+                                                    <p className="text-xs text-muted-foreground">{s.level} · {s.cycle}</p>
+                                                    {s.parent_name && (
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Parent : {s.parent_name} {s.parent_phone && `· ${s.parent_phone}`}
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="font-bold text-foreground">{s.first_name} {s.last_name}</p>
-                                                <p className="text-xs text-muted-foreground">{s.level} · {s.cycle}</p>
-                                                {s.parent_name && (
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Parent : {s.parent_name} {s.parent_phone && `· ${s.parent_phone}`}
-                                                    </p>
-                                                )}
+                                            <div className="text-right">
+                                                <p className="text-lg font-extrabold text-red-600">{s.remaining.toLocaleString()} FCFA</p>
+                                                <p className="text-xs text-muted-foreground">reste à payer</p>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-lg font-extrabold text-red-600">{s.remaining.toLocaleString()} FCFA</p>
-                                            <p className="text-xs text-muted-foreground">reste à payer</p>
-                                        </div>
+
+                                        {/* Barre de progression */}
+                                        {s.totalDue > 0 && (
+                                            <div className="mt-3">
+                                                <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                                    <span>Payé : {s.totalPaidByStudent.toLocaleString()} FCFA</span>
+                                                    <span>Total : {s.totalDue.toLocaleString()} FCFA · {Math.round((s.totalPaidByStudent / s.totalDue) * 100)}%</span>
+                                                </div>
+                                                <div className="w-full bg-muted rounded-full h-2">
+                                                    <div
+                                                        className="h-2 rounded-full bg-emerald-500 transition-all"
+                                                        style={{ width: `${Math.min(100, (s.totalPaidByStudent / s.totalDue) * 100)}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Paiements en attente */}
+                                        {s.unpaidPayments.length > 0 && (
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                <span className="text-xs text-muted-foreground font-medium">En attente :</span>
+                                                {s.unpaidPayments.map(p => (
+                                                    <span key={p.id} className={`text-xs px-2.5 py-1 rounded-full ${STATUS_COLORS[p.status] || ''}`}>
+                                                        {p.type} · {p.trimester} · {p.amount?.toLocaleString()} FCFA
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
+                                ))}
+                            </div>
 
-                                    {/* Barre de progression */}
-                                    {s.totalDue > 0 && (
-                                        <div className="mt-3">
-                                            <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                                                <span>Payé : {s.totalPaidByStudent.toLocaleString()} FCFA</span>
-                                                <span>Total : {s.totalDue.toLocaleString()} FCFA</span>
-                                            </div>
-                                            <div className="w-full bg-muted rounded-full h-2">
-                                                <div
-                                                    className="h-2 rounded-full bg-emerald-500 transition-all"
-                                                    style={{ width: `${Math.min(100, (s.totalPaidByStudent / s.totalDue) * 100)}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Badges paiements en attente */}
-                                    {s.unpaidPayments.length > 0 && (
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                            <span className="text-xs text-muted-foreground font-medium">Paiements en attente :</span>
-                                            {s.unpaidPayments.map(p => (
-                                                <span key={p.id} className={`text-xs px-2.5 py-1 rounded-full ${STATUS_COLORS[p.status] || ''}`}>
-                                                    {p.type} · {p.trimester} · {p.amount?.toLocaleString()} FCFA
-                                                </span>
-                                            ))}
-                                        </div>
-                                    )}
+                            {/* Pagination */}
+                            {totalPages > 1 && (
+                                <div className="flex items-center justify-between pt-2">
+                                    <p className="text-xs text-muted-foreground">
+                                        {(unpaidPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(unpaidPage * ITEMS_PER_PAGE, unpaidStudents.length)} sur {unpaidStudents.length} élèves
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline" size="sm"
+                                            onClick={() => setUnpaidPage(p => Math.max(1, p - 1))}
+                                            disabled={unpaidPage === 1}>
+                                            Précédent
+                                        </Button>
+                                        <span className="text-sm text-muted-foreground">
+                                            {unpaidPage} / {totalPages}
+                                        </span>
+                                        <Button
+                                            variant="outline" size="sm"
+                                            onClick={() => setUnpaidPage(p => Math.min(totalPages, p + 1))}
+                                            disabled={unpaidPage === totalPages}>
+                                            Suivant
+                                        </Button>
+                                    </div>
                                 </div>
-                            ))}
-                        </div>
+                            )}
+                        </>
                     )}
                 </TabsContent>
 
