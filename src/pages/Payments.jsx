@@ -539,10 +539,10 @@ export default function Payments() {
                                                 </td>
                                                 <td className="py-3 px-4">
                                                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${s.percent === 100
-                                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
-                                                            : s.percent > 0
-                                                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
-                                                                : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400'
+                                                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                                        : s.percent > 0
+                                                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                                                            : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400'
                                                         }`}>
                                                         {s.percent === 100 ? 'Soldé' : s.percent > 0 ? 'Partiel' : 'Non payé'}
                                                     </span>
@@ -712,8 +712,8 @@ export default function Payments() {
                                                         <td className="py-3 px-4 text-muted-foreground">{sp.length}</td>
                                                         <td className="py-3 px-4">
                                                             <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${hasUnpaid
-                                                                    ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400'
-                                                                    : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                                                ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400'
+                                                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
                                                                 }`}>
                                                                 {hasUnpaid ? 'Impayés' : 'À jour'}
                                                             </span>
@@ -913,34 +913,44 @@ export default function Payments() {
                                 </Select>
                             </div>
 
-                            {/* Cible */}
+                            {/* Classe spécifique */}
                             <div className="space-y-1.5">
                                 <Label>Classe spécifique</Label>
-                                <Select value={feeForm.class_id} onValueChange={v => setFeeForm(f => ({ ...f, class_id: v }))}>
+                                <Select
+                                    value={feeForm.class_id || 'none'}
+                                    onValueChange={v => setFeeForm(f => ({ ...f, class_id: v === 'none' ? '' : v }))}>
                                     <SelectTrigger><SelectValue placeholder="Optionnel" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">Aucune</SelectItem>
+                                        <SelectItem value="none">Aucune</SelectItem>
                                         {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
+
+                            {/* Cycle */}
                             <div className="space-y-1.5">
                                 <Label>Cycle</Label>
-                                <Select value={feeForm.cycle} onValueChange={v => setFeeForm(f => ({ ...f, cycle: v, level: '' }))}>
+                                <Select
+                                    value={feeForm.cycle || 'none'}
+                                    onValueChange={v => setFeeForm(f => ({ ...f, cycle: v === 'none' ? '' : v, level: '' }))}>
                                     <SelectTrigger><SelectValue placeholder="Optionnel" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">Aucun</SelectItem>
+                                        <SelectItem value="none">Aucun</SelectItem>
                                         {CYCLES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
+
+                            {/* Niveau */}
                             {feeForm.cycle && (
                                 <div className="space-y-1.5 col-span-2">
                                     <Label>Niveau</Label>
-                                    <Select value={feeForm.level} onValueChange={v => setFeeForm(f => ({ ...f, level: v }))}>
+                                    <Select
+                                        value={feeForm.level || 'none'}
+                                        onValueChange={v => setFeeForm(f => ({ ...f, level: v === 'none' ? '' : v }))}>
                                         <SelectTrigger><SelectValue placeholder="Optionnel" /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="">Aucun</SelectItem>
+                                            <SelectItem value="none">Aucun</SelectItem>
                                             {LEVELS_BY_CYCLE[feeForm.cycle]?.map(l => (
                                                 <SelectItem key={l} value={l}>{l}</SelectItem>
                                             ))}
@@ -989,7 +999,6 @@ export default function Payments() {
                     </form>
                 </DialogContent>
             </Dialog>
-
             {/* Alert suppression paiement */}
             <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
                 <AlertDialogContent>
