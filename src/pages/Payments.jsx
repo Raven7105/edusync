@@ -278,15 +278,19 @@ export default function Payments() {
     const unpaidStudents = students
         .filter(s => s.status === 'Actif')
         .map(s => {
-            const sPayments = payments.filter(p => p.student_id === s.id);
-            const unpaid = sPayments.filter(p => p.status !== 'Payé');
-            const totalUnpaid = unpaid.reduce((acc, p) => acc + (p.amount || 0), 0);
-            return { ...s, unpaid, totalUnpaid };
+            const fee = getApplicableFee(s);
+            const totalDue = fee?.amount || 0;
+            const totalPaidByStudent = payments
+                .filter(p => p.student_id === s.id && p.status === 'Payé' && p.type === 'Scolarité')
+                .reduce((acc, p) => acc + (p.amount || 0), 0);
+            const remaining = Math.max(0, totalDue - totalPaidByStudent);
+            const unpaidPayments = payments.filter(p => p.student_id === s.id && p.status !== 'Payé');
+            return { ...s, totalDue, totalPaidByStudent, remaining, unpaidPayments };
         })
-        .filter(s => s.unpaid.length > 0)
+        .filter(s => s.remaining > 0)
         .filter(s => `${s.first_name} ${s.last_name}`.toLowerCase().includes(unpaidSearch.toLowerCase()));
 
-    const grandTotal = unpaidStudents.reduce((acc, s) => acc + s.totalUnpaid, 0);
+    const grandTotal = unpaidStudents.reduce((acc, s) => acc + s.remaining, 0);
 
     // Évolution par classe
     const classStudents = selectedClassId ? students.filter(s => s.class_id === selectedClassId) : [];
@@ -554,6 +558,7 @@ export default function Payments() {
                 </TabsContent>
 
                 {/* Tab 3: Impayés */}
+                {/* Tab 3: Impayés */}
                 <TabsContent value="unpaid" className="space-y-4">
                     <div className="flex items-center justify-between flex-wrap gap-3">
                         <p className="text-sm text-muted-foreground">
@@ -595,17 +600,38 @@ export default function Payments() {
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-lg font-extrabold text-red-600">{s.totalUnpaid.toLocaleString()} FCFA</p>
-                                            <p className="text-xs text-muted-foreground">en attente</p>
+                                            <p className="text-lg font-extrabold text-red-600">{s.remaining.toLocaleString()} FCFA</p>
+                                            <p className="text-xs text-muted-foreground">reste à payer</p>
                                         </div>
                                     </div>
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                        {s.unpaid.map(p => (
-                                            <span key={p.id} className={`text-xs px-2.5 py-1 rounded-full ${STATUS_COLORS[p.status] || ''}`}>
-                                                {p.type} · {p.trimester} · {p.amount?.toLocaleString()} FCFA
-                                            </span>
-                                        ))}
-                                    </div>
+
+                                    {/* Barre de progression */}
+                                    {s.totalDue > 0 && (
+                                        <div className="mt-3">
+                                            <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                                <span>Payé : {s.totalPaidByStudent.toLocaleString()} FCFA</span>
+                                                <span>Total : {s.totalDue.toLocaleString()} FCFA</span>
+                                            </div>
+                                            <div className="w-full bg-muted rounded-full h-2">
+                                                <div
+                                                    className="h-2 rounded-full bg-emerald-500 transition-all"
+                                                    style={{ width: `${Math.min(100, (s.totalPaidByStudent / s.totalDue) * 100)}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Badges paiements en attente */}
+                                    {s.unpaidPayments.length > 0 && (
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            <span className="text-xs text-muted-foreground font-medium">Paiements en attente :</span>
+                                            {s.unpaidPayments.map(p => (
+                                                <span key={p.id} className={`text-xs px-2.5 py-1 rounded-full ${STATUS_COLORS[p.status] || ''}`}>
+                                                    {p.type} · {p.trimester} · {p.amount?.toLocaleString()} FCFA
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -723,8 +749,8 @@ export default function Payments() {
                                                         <td className="py-3 px-4 text-muted-foreground">{sp.length}</td>
                                                         <td className="py-3 px-4">
                                                             <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${!hasUnpaid
-                                                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
-                                                                    : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400'
+                                                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                                                : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400'
                                                                 }`}>
                                                                 {hasUnpaid ? 'Impayés' : 'À jour'}
                                                             </span>
