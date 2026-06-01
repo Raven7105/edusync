@@ -220,16 +220,20 @@ export default function Payments() {
     const handleFeeSave = (e) => {
         e.preventDefault();
         if (!feeForm.amount) { toast.error('Entrez un montant'); return; }
+        if (!feeForm.cycle) { toast.error('Sélectionnez un cycle'); return; }
+
+        const { class_id, ...feeWithoutClassId } = feeForm;
+
         const payload = {
-            ...feeForm,
+            ...feeWithoutClassId,
             amount: parseFloat(feeForm.amount),
             trimester_1: feeForm.trimester_1 ? parseFloat(feeForm.trimester_1) : null,
             trimester_2: feeForm.trimester_2 ? parseFloat(feeForm.trimester_2) : null,
             trimester_3: feeForm.trimester_3 ? parseFloat(feeForm.trimester_3) : null,
             cycle: feeForm.cycle || null,
             level: feeForm.level || null,
-            class_id: feeForm.class_id || null,
         };
+
         if (editingFeeId) {
             updateFeeMut.mutate({ id: editingFeeId, data: payload });
         } else {
@@ -694,19 +698,33 @@ export default function Payments() {
                                         <tbody>
                                             {classStudents.map(s => {
                                                 const sp = payments.filter(p => p.student_id === s.id);
-                                                const paid = sp.filter(p => p.status === 'Payé').reduce((a, p) => a + (p.amount || 0), 0);
-                                                const due = sp.filter(p => p.status !== 'Payé').reduce((a, p) => a + (p.amount || 0), 0);
-                                                const hasUnpaid = sp.some(p => p.status !== 'Payé');
+                                                const paid = sp
+                                                    .filter(p => p.status === 'Payé' && p.type === 'Scolarité')
+                                                    .reduce((a, p) => a + (p.amount || 0), 0);
+
+                                                // Récupère les frais configurés pour cet élève
+                                                const fee = getApplicableFee(s);
+                                                const totalDue = fee?.amount || 0;
+                                                const remaining = Math.max(0, totalDue - paid);
+                                                const hasUnpaid = remaining > 0;
+
                                                 return (
                                                     <tr key={s.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                                                         <td className="py-3 px-4 font-medium text-foreground">{s.first_name} {s.last_name}</td>
                                                         <td className="py-3 px-4 text-emerald-600 font-semibold">{paid.toLocaleString()} FCFA</td>
-                                                        <td className="py-3 px-4 text-red-500 font-semibold">{due > 0 ? `${due.toLocaleString()} FCFA` : '—'}</td>
+                                                        <td className="py-3 px-4 font-semibold">
+                                                            {totalDue > 0
+                                                                ? <span className={remaining > 0 ? 'text-red-500' : 'text-emerald-600'}>
+                                                                    {remaining > 0 ? `${remaining.toLocaleString()} FCFA` : 'Soldé'}
+                                                                </span>
+                                                                : <span className="text-muted-foreground/50">Non configuré</span>
+                                                            }
+                                                        </td>
                                                         <td className="py-3 px-4 text-muted-foreground">{sp.length}</td>
                                                         <td className="py-3 px-4">
-                                                            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${hasUnpaid
-                                                                ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400'
-                                                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                                            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${!hasUnpaid
+                                                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                                                    : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400'
                                                                 }`}>
                                                                 {hasUnpaid ? 'Impayés' : 'À jour'}
                                                             </span>
@@ -795,7 +813,7 @@ export default function Payments() {
 
             {/* Dialog paiement */}
             <Dialog open={dialogOpen} onOpenChange={closeDialog}>
-                <DialogContent className="max-w-lg">
+                <DialogContent className="max-w-lg" aria-describedby={undefined}>
                     <DialogHeader>
                         <DialogTitle>{editingId ? 'Modifier le paiement' : 'Nouveau paiement'}</DialogTitle>
                     </DialogHeader>
@@ -879,9 +897,8 @@ export default function Payments() {
             </Dialog>
 
             {/* Dialog config frais */}
-            {/* Dialog config frais */}
             <Dialog open={feeDialogOpen} onOpenChange={closeFeeDialog}>
-                <DialogContent className="max-w-lg">
+                <DialogContent className="max-w-lg" aria-describedby={undefined}>
                     <DialogHeader>
                         <DialogTitle>{editingFeeId ? 'Modifier la configuration' : 'Nouvelle configuration de frais'}</DialogTitle>
                     </DialogHeader>
