@@ -570,7 +570,7 @@ export default function Payments() {
                         </div>
                     )}
                 </TabsContent>
-                {/* Tab 3: Impayés */}
+                
                 {/* Tab 3: Impayés */}
                 <TabsContent value="unpaid" className="space-y-4">
 
