@@ -46,7 +46,7 @@ const defaultPaymentForm = () => ({
 
 const defaultFeeForm = () => ({
     school_year: '2025-2026',
-    cycle: '', level: '', class_id: '',
+    cycle: '', level: '',
     type: 'Scolarité', amount: '',
     trimester_1: '', trimester_2: '', trimester_3: '',
     description: '',
@@ -239,22 +239,15 @@ export default function Payments() {
 
     // Fonction pour trouver les frais applicables à un élève
     const getApplicableFee = (student) => {
-        // Priorité : classe > niveau > cycle
+        // Priorité : niveau > cycle
         let fee = feeConfigs.find(f =>
-            f.class_id === student.class_id &&
+            f.level === student.level &&
             f.type === 'Scolarité' &&
             f.school_year === '2025-2026'
         );
         if (!fee) {
             fee = feeConfigs.find(f =>
-                !f.class_id && f.level === student.level &&
-                f.type === 'Scolarité' &&
-                f.school_year === '2025-2026'
-            );
-        }
-        if (!fee) {
-            fee = feeConfigs.find(f =>
-                !f.class_id && !f.level && f.cycle === student.cycle &&
+                !f.level && f.cycle === student.cycle &&
                 f.type === 'Scolarité' &&
                 f.school_year === '2025-2026'
             );
@@ -886,6 +879,7 @@ export default function Payments() {
             </Dialog>
 
             {/* Dialog config frais */}
+            {/* Dialog config frais */}
             <Dialog open={feeDialogOpen} onOpenChange={closeFeeDialog}>
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
@@ -894,7 +888,7 @@ export default function Payments() {
                     <form onSubmit={handleFeeSave} className="space-y-4">
                         <div className="bg-muted/40 rounded-lg p-3">
                             <p className="text-xs text-muted-foreground">
-                                Définissez la cible : classe spécifique {">"} niveau {">"} cycle. Plus c'est précis, plus ça prend la priorité.
+                                Les frais s'appliquent à tous les élèves du même cycle/niveau. Ex: tous les CP paient le même montant.
                             </p>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
@@ -913,51 +907,36 @@ export default function Payments() {
                                 </Select>
                             </div>
 
-                            {/* Classe spécifique */}
-                            <div className="space-y-1.5">
-                                <Label>Classe spécifique</Label>
-                                <Select
-                                    value={feeForm.class_id || 'none'}
-                                    onValueChange={v => setFeeForm(f => ({ ...f, class_id: v === 'none' ? '' : v }))}>
-                                    <SelectTrigger><SelectValue placeholder="Optionnel" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">Aucune</SelectItem>
-                                        {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
                             {/* Cycle */}
                             <div className="space-y-1.5">
-                                <Label>Cycle</Label>
+                                <Label>Cycle *</Label>
                                 <Select
                                     value={feeForm.cycle || 'none'}
                                     onValueChange={v => setFeeForm(f => ({ ...f, cycle: v === 'none' ? '' : v, level: '' }))}>
-                                    <SelectTrigger><SelectValue placeholder="Optionnel" /></SelectTrigger>
+                                    <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="none">Aucun</SelectItem>
+                                        <SelectItem value="none">Sélectionner</SelectItem>
                                         {CYCLES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
 
                             {/* Niveau */}
-                            {feeForm.cycle && (
-                                <div className="space-y-1.5 col-span-2">
-                                    <Label>Niveau</Label>
-                                    <Select
-                                        value={feeForm.level || 'none'}
-                                        onValueChange={v => setFeeForm(f => ({ ...f, level: v === 'none' ? '' : v }))}>
-                                        <SelectTrigger><SelectValue placeholder="Optionnel" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="none">Aucun</SelectItem>
-                                            {LEVELS_BY_CYCLE[feeForm.cycle]?.map(l => (
-                                                <SelectItem key={l} value={l}>{l}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            )}
+                            <div className="space-y-1.5">
+                                <Label>Niveau</Label>
+                                <Select
+                                    value={feeForm.level || 'none'}
+                                    onValueChange={v => setFeeForm(f => ({ ...f, level: v === 'none' ? '' : v }))}
+                                    disabled={!feeForm.cycle}>
+                                    <SelectTrigger><SelectValue placeholder="Optionnel" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Tous les niveaux du cycle</SelectItem>
+                                        {LEVELS_BY_CYCLE[feeForm.cycle]?.map(l => (
+                                            <SelectItem key={l} value={l}>{l}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
 
                             {/* Montants */}
                             <div className="space-y-1.5 col-span-2">
@@ -966,19 +945,19 @@ export default function Payments() {
                                     onChange={e => setFeeForm(f => ({ ...f, amount: e.target.value }))} required />
                             </div>
                             <div className="space-y-1.5">
-                                <Label>Montant Trimestre 1 (FCFA)</Label>
+                                <Label>Trimestre 1 (FCFA)</Label>
                                 <Input type="number" value={feeForm.trimester_1}
                                     onChange={e => setFeeForm(f => ({ ...f, trimester_1: e.target.value }))}
                                     placeholder="Optionnel" />
                             </div>
                             <div className="space-y-1.5">
-                                <Label>Montant Trimestre 2 (FCFA)</Label>
+                                <Label>Trimestre 2 (FCFA)</Label>
                                 <Input type="number" value={feeForm.trimester_2}
                                     onChange={e => setFeeForm(f => ({ ...f, trimester_2: e.target.value }))}
                                     placeholder="Optionnel" />
                             </div>
                             <div className="space-y-1.5">
-                                <Label>Montant Trimestre 3 (FCFA)</Label>
+                                <Label>Trimestre 3 (FCFA)</Label>
                                 <Input type="number" value={feeForm.trimester_3}
                                     onChange={e => setFeeForm(f => ({ ...f, trimester_3: e.target.value }))}
                                     placeholder="Optionnel" />
@@ -992,7 +971,7 @@ export default function Payments() {
                         </div>
                         <div className="flex justify-end gap-3 pt-2 border-t border-border">
                             <Button type="button" variant="outline" onClick={closeFeeDialog}>Annuler</Button>
-                            <Button type="submit" disabled={isFeePending || !feeForm.amount}>
+                            <Button type="submit" disabled={isFeePending || !feeForm.amount || !feeForm.cycle}>
                                 {isFeePending ? 'Enregistrement...' : editingFeeId ? 'Mettre à jour' : 'Enregistrer'}
                             </Button>
                         </div>

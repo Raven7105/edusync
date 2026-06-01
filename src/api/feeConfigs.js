@@ -3,8 +3,8 @@ import { supabase } from './supabaseClient'
 export const fetchFeeConfigs = async () => {
     const { data, error } = await supabase
         .from('fee_configs')
-        .select('*, school_classes(name)')
-        .order('created_at', { ascending: false });
+        .select('*')
+        .order('cycle', { ascending: true });
     if (error) throw error;
     return data || [];
 }
@@ -23,6 +23,7 @@ export const deleteFeeConfig = async (id) => {
     const { error } = await supabase.from('fee_configs').delete().eq('id', id);
     if (error) throw error;
 }
+
 
 // Récupère les frais applicables à un élève
 export const getStudentFees = async (studentId) => {
