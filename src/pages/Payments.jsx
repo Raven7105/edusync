@@ -275,12 +275,12 @@ export default function Payments() {
     });
 
     const [unpaidPage, setUnpaidPage] = useState(1);
+    const [unpaidSort, setUnpaidSort] = useState('remaining_desc');
     const [unpaidCycleFilter, setUnpaidCycleFilter] = useState('all');
-    const [unpaidSort, setUnpaidSort] = useState('desc');
     const ITEMS_PER_PAGE = 10;
 
     // Impayés
-    const unpaidStudents = students
+    const allUnpaidStudents = students
         .filter(s => s.status === 'Actif')
         .map(s => {
             const fee = getApplicableFee(s);
@@ -295,11 +295,16 @@ export default function Payments() {
         .filter(s => s.remaining > 0)
         .filter(s => `${s.first_name} ${s.last_name}`.toLowerCase().includes(unpaidSearch.toLowerCase()))
         .filter(s => unpaidCycleFilter === 'all' || s.cycle === unpaidCycleFilter)
-        .sort((a, b) => unpaidSort === 'desc' ? b.remaining - a.remaining : a.remaining - b.remaining);
+        .sort((a, b) => {
+            if (unpaidSort === 'remaining_desc') return b.remaining - a.remaining;
+            if (unpaidSort === 'remaining_asc') return a.remaining - b.remaining;
+            if (unpaidSort === 'name_asc') return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+            return 0;
+        });
 
-    const grandTotal = unpaidStudents.reduce((acc, s) => acc + s.remaining, 0);
-    const totalPages = Math.ceil(unpaidStudents.length / ITEMS_PER_PAGE);
-    const paginatedUnpaid = unpaidStudents.slice((unpaidPage - 1) * ITEMS_PER_PAGE, unpaidPage * ITEMS_PER_PAGE);
+    const grandTotal = allUnpaidStudents.reduce((acc, s) => acc + s.remaining, 0);
+    const totalPages = Math.ceil(allUnpaidStudents.length / ITEMS_PER_PAGE);
+    const unpaidStudents = allUnpaidStudents.slice((unpaidPage - 1) * ITEMS_PER_PAGE, unpaidPage * ITEMS_PER_PAGE);
 
     // Évolution par classe
     const classStudents = selectedClassId ? students.filter(s => s.class_id === selectedClassId) : [];
@@ -566,51 +571,59 @@ export default function Payments() {
                     )}
                 </TabsContent>
                 {/* Tab 3: Impayés */}
+                {/* Tab 3: Impayés */}
                 <TabsContent value="unpaid" className="space-y-4">
-                    {/* Header stats */}
+
+                    {/* Stats rapides */}
                     <div className="grid grid-cols-3 gap-4">
-                        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl p-4">
-                            <p className="text-xs text-red-600 font-medium uppercase tracking-wide">Élèves concernés</p>
-                            <p className="text-2xl font-extrabold text-red-600 mt-1">{unpaidStudents.length}</p>
+                        <div className="bg-card rounded-xl border border-border p-4">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Élèves concernés</p>
+                            <p className="text-2xl font-extrabold text-red-600 mt-1">{allUnpaidStudents.length}</p>
                         </div>
-                        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-xl p-4">
-                            <p className="text-xs text-amber-600 font-medium uppercase tracking-wide">Total restant dû</p>
-                            <p className="text-2xl font-extrabold text-amber-600 mt-1">{grandTotal.toLocaleString()} FCFA</p>
+                        <div className="bg-card rounded-xl border border-border p-4">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Total restant dû</p>
+                            <p className="text-2xl font-extrabold text-red-600 mt-1">{grandTotal.toLocaleString()} FCFA</p>
                         </div>
-                        <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 rounded-xl p-4">
-                            <p className="text-xs text-emerald-600 font-medium uppercase tracking-wide">Taux de recouvrement</p>
-                            <p className="text-2xl font-extrabold text-emerald-600 mt-1">
-                                {students.filter(s => s.status === 'Actif').length > 0
-                                    ? `${Math.round(((students.filter(s => s.status === 'Actif').length - unpaidStudents.length) / students.filter(s => s.status === 'Actif').length) * 100)}%`
-                                    : '0%'}
+                        <div className="bg-card rounded-xl border border-border p-4">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Moyenne par élève</p>
+                            <p className="text-2xl font-extrabold text-amber-600 mt-1">
+                                {allUnpaidStudents.length > 0
+                                    ? Math.round(grandTotal / allUnpaidStudents.length).toLocaleString()
+                                    : 0} FCFA
                             </p>
                         </div>
                     </div>
 
                     {/* Filtres */}
-                    <div className="flex flex-col sm:flex-row gap-3">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                            <Input placeholder="Rechercher un élève..." value={unpaidSearch}
-                                onChange={e => { setUnpaidSearch(e.target.value); setUnpaidPage(1); }} className="pl-9" />
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <div className="flex gap-3 flex-wrap">
+                            <div className="relative w-56">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input placeholder="Rechercher..." value={unpaidSearch}
+                                    onChange={e => { setUnpaidSearch(e.target.value); setUnpaidPage(1); }} className="pl-9" />
+                            </div>
+                            <Select value={unpaidCycleFilter} onValueChange={v => { setUnpaidCycleFilter(v); setUnpaidPage(1); }}>
+                                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Tous les cycles</SelectItem>
+                                    {CYCLES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <Select value={unpaidSort} onValueChange={setUnpaidSort}>
+                                <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="remaining_desc">Reste ↓ (plus élevé)</SelectItem>
+                                    <SelectItem value="remaining_asc">Reste ↑ (plus faible)</SelectItem>
+                                    <SelectItem value="name_asc">Nom A → Z</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
-                        <Select value={unpaidCycleFilter} onValueChange={v => { setUnpaidCycleFilter(v); setUnpaidPage(1); }}>
-                            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Tous les cycles</SelectItem>
-                                {CYCLES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        <Select value={unpaidSort} onValueChange={setUnpaidSort}>
-                            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="desc">Plus élevé d'abord</SelectItem>
-                                <SelectItem value="asc">Plus faible d'abord</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                            {allUnpaidStudents.length} élève{allUnpaidStudents.length > 1 ? 's' : ''} · Page {unpaidPage}/{totalPages || 1}
+                        </p>
                     </div>
 
-                    {unpaidStudents.length === 0 ? (
+                    {allUnpaidStudents.length === 0 ? (
                         <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-12 text-center">
                             <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
                             <p className="text-emerald-700 dark:text-emerald-400 font-semibold text-lg">Aucun impayé !</p>
@@ -619,7 +632,7 @@ export default function Payments() {
                     ) : (
                         <>
                             <div className="space-y-3">
-                                {paginatedUnpaid.map(s => (
+                                {unpaidStudents.map(s => (
                                     <div key={s.id} className="bg-card border border-border rounded-2xl p-5">
                                         <div className="flex items-start justify-between gap-4 flex-wrap">
                                             <div className="flex items-center gap-3">
@@ -649,7 +662,7 @@ export default function Payments() {
                                             <div className="mt-3">
                                                 <div className="flex justify-between text-xs text-muted-foreground mb-1">
                                                     <span>Payé : {s.totalPaidByStudent.toLocaleString()} FCFA</span>
-                                                    <span>Total : {s.totalDue.toLocaleString()} FCFA · {Math.round((s.totalPaidByStudent / s.totalDue) * 100)}%</span>
+                                                    <span>Total : {s.totalDue.toLocaleString()} FCFA</span>
                                                 </div>
                                                 <div className="w-full bg-muted rounded-full h-2">
                                                     <div
@@ -660,10 +673,10 @@ export default function Payments() {
                                             </div>
                                         )}
 
-                                        {/* Paiements en attente */}
+                                        {/* Badges paiements en attente */}
                                         {s.unpaidPayments.length > 0 && (
                                             <div className="mt-3 flex flex-wrap gap-2">
-                                                <span className="text-xs text-muted-foreground font-medium">En attente :</span>
+                                                <span className="text-xs text-muted-foreground font-medium">Paiements en attente :</span>
                                                 {s.unpaidPayments.map(p => (
                                                     <span key={p.id} className={`text-xs px-2.5 py-1 rounded-full ${STATUS_COLORS[p.status] || ''}`}>
                                                         {p.type} · {p.trimester} · {p.amount?.toLocaleString()} FCFA
@@ -677,27 +690,38 @@ export default function Payments() {
 
                             {/* Pagination */}
                             {totalPages > 1 && (
-                                <div className="flex items-center justify-between pt-2">
-                                    <p className="text-xs text-muted-foreground">
-                                        {(unpaidPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(unpaidPage * ITEMS_PER_PAGE, unpaidStudents.length)} sur {unpaidStudents.length} élèves
-                                    </p>
-                                    <div className="flex items-center gap-2">
-                                        <Button
-                                            variant="outline" size="sm"
-                                            onClick={() => setUnpaidPage(p => Math.max(1, p - 1))}
-                                            disabled={unpaidPage === 1}>
-                                            Précédent
-                                        </Button>
-                                        <span className="text-sm text-muted-foreground">
-                                            {unpaidPage} / {totalPages}
-                                        </span>
-                                        <Button
-                                            variant="outline" size="sm"
-                                            onClick={() => setUnpaidPage(p => Math.min(totalPages, p + 1))}
-                                            disabled={unpaidPage === totalPages}>
-                                            Suivant
-                                        </Button>
+                                <div className="flex items-center justify-center gap-2 pt-2">
+                                    <Button
+                                        variant="outline" size="sm"
+                                        onClick={() => setUnpaidPage(p => Math.max(1, p - 1))}
+                                        disabled={unpaidPage === 1}>
+                                        ← Précédent
+                                    </Button>
+                                    <div className="flex gap-1">
+                                        {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                            .filter(p => p === 1 || p === totalPages || Math.abs(p - unpaidPage) <= 1)
+                                            .map((p, idx, arr) => (
+                                                <React.Fragment key={p}>
+                                                    {idx > 0 && arr[idx - 1] !== p - 1 && (
+                                                        <span className="px-2 py-1 text-muted-foreground">...</span>
+                                                    )}
+                                                    <Button
+                                                        variant={unpaidPage === p ? 'default' : 'outline'}
+                                                        size="sm"
+                                                        onClick={() => setUnpaidPage(p)}
+                                                        className="w-8 h-8 p-0">
+                                                        {p}
+                                                    </Button>
+                                                </React.Fragment>
+                                            ))
+                                        }
                                     </div>
+                                    <Button
+                                        variant="outline" size="sm"
+                                        onClick={() => setUnpaidPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={unpaidPage === totalPages}>
+                                        Suivant →
+                                    </Button>
                                 </div>
                             )}
                         </>
