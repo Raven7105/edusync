@@ -13,6 +13,7 @@ import Classes from './pages/admin/Classes'
 import Grades from './pages/admin/Grades'
 import Absences from './pages/admin/Absences'
 import Payments from './pages/admin/Payments'
+import Reports from './pages/admin/Reports'
 
 const queryClient = new QueryClient()
 
@@ -55,6 +56,7 @@ function App() {
                 <Route path="/notes" element={<Grades />} />
                 <Route path="/absences" element={<Absences />} />
                 <Route path="/paiements" element={<Payments />} />
+                <Route path="/rapports" element={<Reports />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Route>
             )}
